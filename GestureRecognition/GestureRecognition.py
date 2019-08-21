@@ -1,5 +1,6 @@
 import os
 import unittest
+import math
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
@@ -104,23 +105,29 @@ class GestureRecognitionWidget(ScriptedLoadableModuleWidget):
 
         # Add vertical spacer
         self.layout.addStretch(0.5)
+        self.logic = GestureRecognitionLogic()
         self.arr = []
+        self.arr2 = []
         self.numLines = 0
 
     def onCreateTrainingFileButtonPressed(self, value):
-        file = open("C:/d/grt-bin/Debug/TrainingDataSlicer.grt", "w")
-        file.write("GRT_LABELLED_TIME_SERIES_CLASSIFICATION_DATA_FILE_V1.0\n")
+        file = open("C:/GRT/grt-bin/Debug/TrainingDataSlicerANCB.grt", "w")
+        file.write("GRT_LABELLED_CLASSIFICATION_DATA_FILE_V1.0\n")
         file.write("DatasetName: DummyData\n")
-        file.write("InfoText: This data contains some dummy timeseries data\n")
+        file.write("InfoText: This data contains some dummy orientation data\n")
         file.write("NumDimensions: 3\n")
-        file.write("TotalNumTrainingExamples: 15\n")
+        file.write("TotalNumTrainingExamples:  " + str(self.numLines) + "\n")
         file.write("NumberOfClasses: 3\n")
         file.write("ClassIDsAndCounters: \n")
-        file.write("1   5\n")
-        file.write("2   5\n")
-        file.write("3   5\n")
+
+        for i in range(self.arr2.__len__()):
+            file.write(str(i+1) + "   " + str(self.arr2[i].__len__()) + " NOT_SET" + "\n")
+
         file.write("UseExternalRanges: 0\n")
-        file.write("LabelledTimeSeriesTrainingData:")
+        file.write("LabelledTrainingData: \n")
+        for asd in self.arr2:
+            for asd1 in asd:
+                file.write(str(int(asd1[0])) + "  " + str(asd1[1]) + "  " + str(asd1[2]) + "  " + str(asd1[3]) + "\n")
         file.close()
 
 
@@ -131,32 +138,29 @@ class GestureRecognitionWidget(ScriptedLoadableModuleWidget):
         self.gestureLabel = self.labelSlider.value
         self.labelSlider.setDisabled(True)
         self.startGRTSequenceButton.setDisabled(True)
-        print self.tranNode
+        print(self.tranNode)
         self.tranNodeObserver = self.tranNode.AddObserver(slicer.vtkMRMLTransformNode.TransformModifiedEvent, self.updateTransforms)
 
 
     def updateTransforms(self, caller, event):
         matr = self.tranNode.GetMatrixTransformToParent()
-        x = matr.GetElement(0,3)
-        y = matr.GetElement(1,3)
-        z = matr.GetElement(2,3)
-        print x
         self.numLines += 1
-        self.arr.append((x,y,z))
+        self.arr.append((self.labelSlider.value, self.logic.RotationMatrixToEulerAngles(matr)[0], self.logic.RotationMatrixToEulerAngles(matr)[1],
+                         self.logic.RotationMatrixToEulerAngles(matr)[2]))
 
 
     def onStopGRTSequenceButtonPressed(self, value):
-        print "TEST"
+        print("TEST")
         self.tranNode.RemoveObserver(self.tranNodeObserver)
-        self.appendToTrainingDataFile()
+        #self.appendToTrainingDataFile()
+        self.arr2.append(self.arr)
         self.startGRTSequenceButton.setDisabled(False)
         self.stopGRTSequenceButton.setDisabled(True)
         self.labelSlider.setDisabled(False)
         self.arr = []
-        self.numLines = 0
 
     def appendToTrainingDataFile(self):
-        file = open("C:/d/grt-bin/Debug/TrainingDataSlicer.grt", "a+")
+        file = open("C:/d/grt-bin/Debug/TrainingDataSlicerANBC.grt", "a+")
         #file = open('C:/users/danie/Documents/TrainingDataSlicer.grt', 'w')
         file.write("\n************TIME_SERIES************\n")
         file.write("ClassID: ")
@@ -190,7 +194,23 @@ class GestureRecognitionLogic(ScriptedLoadableModuleLogic):
 
     def __init__(self, parent = None):
         ScriptedLoadableModuleLogic.__init__(self, parent)
-        slicer.mymod = self
+
+
+    def RotationMatrixToEulerAngles(self, matr):
+        sy = math.sqrt(matr.GetElement(0, 0) * matr.GetElement(0, 0) + matr.GetElement(1, 0) * matr.GetElement(1, 0))
+        singular = sy < 1e-6
+        if singular == 0:
+            x = math.atan2(matr.GetElement(2, 1), matr.GetElement(2, 2))
+            y = math.atan2(-matr.GetElement(2, 0), sy)
+            z = math.atan2(matr.GetElement(1, 0), matr.GetElement(0, 0))
+        else:
+            x = math.atan2(-matr.GetElement(1, 2), matr.GetElement(1, 1))
+            y = math.atan2(-matr.GetElement(2, 0), sy)
+            z = 0
+        x = (x * 180 / 3.14159)/180
+        y = (y * 180 / 3.14159)/180
+        z = (z * 180 / 3.14159)/180
+        return [x,y,z]
 
 
 
